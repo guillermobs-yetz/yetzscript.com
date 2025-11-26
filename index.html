@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>YetzScript - Alfabeto Activable</title>
+  <style>
+    body{font-family:system-ui,Segoe UI,Roboto,Arial;margin:20px}
+    h1{margin-bottom:5px}
+    .controls{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+    .grid{display:flex;flex-wrap:wrap;gap:10px;margin-top:10px}
+    .symbol-box{width:80px;height:80px;border:1px solid #444;display:flex;align-items:center;justify-content:center}
+    canvas.symbol{width:80px;height:80px;background:#fff;cursor:crosshair}
+    .map-row{display:flex;gap:8px;align-items:center}
+    .output{min-height:120px;border:1px dashed #666;padding:8px;margin-top:12px}
+    .button{padding:8px 12px;border:0;border-radius:6px;background:#0366d6;color:#fff;cursor:pointer}
+    label.switch{display:inline-flex;align-items:center;gap:8px}
+    .small{font-size:0.9rem}
+  </style>
+</head>
+<body>
+<h1>YetzScript - Alfabeto Activable</h1>
+<p class="small">Dibuja símbolos, asigna teclas y activa <strong>"Activar alfabeto"</strong> para escribir con tus símbolos en el recuadro editable. Ahora el texto es completamente copiable.</p>
+<section>
+<div class="controls">
+<button id="addSymbol" class="button">Añadir símbolo</button>
+<button id="exportAll" class="button">Exportar alfabeto (JSON)</button>
+<input id="loadFile" type="file" accept="application/json">
+<label class="switch"><input type="checkbox" id="toggleActive"><span>Activar alfabeto</span></label>
+<button id="copyPlain" class="button">Copiar texto</button>
+</div>
+
+<div class="grid" id="symbolGrid" aria-live="polite"></div>
+
+<h3>Asignaciones (Símbolo → Tecla)</h3>
+<div id="keyMapping"></div>
+
+<h3>Salida (editable)</h3>
+<div id="output" class="output" contenteditable="true" aria-label="Salida editable"></div>
+</section>
+
+<script>
+const symbols=[];
+const keyMap=new Map();
+const symbolGrid=document.getElementById('symbolGrid');
+const keyMapping=document.getElementById('keyMapping');
+const addSymbolBtn=document.getElementById('addSymbol');
+const toggleActive=document.getElementById('toggleActive');
+const output=document.getElementById('output');
+const exportAll=document.getElementById('exportAll');
+const loadFile=document.getElementById('loadFile');
+const copyPlain=document.getElementById('copyPlain');
+
+// Genera un código textual único para cada símbolo
+function generateSymbolCode(idx){ return '⧫'+(idx+1); }
+
+function createSymbolCanvas(idx, initialDataURL){
+  const wrapper=document.createElement('div');
+  wrapper.className='symbol-box';
+
+  const canvas=document.createElement('canvas');
+  canvas.width=120; canvas.height=120;
+  canvas.className='symbol'; canvas.style.width='80px'; canvas.style.height='80px';
+
+  const ctx=canvas.getContext('2d');
+  ctx.fillStyle='#ffffff'; ctx.fillRect(0,0,canvas.width,canvas.height);
+
+  let drawing=false; let last=null;
+  function getPos(e){const rect=canvas.getBoundingClientRect();const x=(e.clientX-rect.left)*(canvas.width/rect.width);const y=(e.clientY-rect.top)*(canvas.height/rect.height);return {x,y};}
+  canvas.addEventListener('pointerdown',(e)=>{drawing=true; last=getPos(e);});
+  canvas.addEventListener('pointerup',()=>{drawing=false; last=null; saveState(); updateKeyMapping();});
+  canvas.addEventListener('pointermove',(e)=>{if(!drawing) return; const p=getPos(e); ctx.strokeStyle='#000'; ctx.lineWidth=6; ctx.lineCap='round'; ctx.beginPath(); ctx.moveTo(last.x,last.y); ctx.lineTo(p.x,p.y); ctx.stroke(); last=p;});
+
+  const clearBtn=document.createElement('button'); clearBtn.className='button small'; clearBtn.style.padding='6px'; clearBtn.style.fontSize='12px'; clearBtn.textContent='Borrar';
+  clearBtn.addEventListener('click',()=>{ctx.clearRect(0,0,canvas.width,canvas.height); ctx.fillStyle='#fff'; ctx.fillRect(0,0,canvas.width,canvas.height); saveState(); updateKeyMapping();});
+
+  wrapper.appendChild(canvas); wrapper.appendChild(clearBtn);
+  return {wrapper, canvas};
+}
+
+function saveState(){symbols.forEach(s=>{s.dataURL=s.canvas.toDataURL('image/png');});}
+
+function addSymbol(initialDataURL){
+  const idx=symbols.length;
+  const obj=createSymbolCanvas(idx, initialDataURL);
+  symbolGrid.appendChild(obj.wrapper);
+  symbols.push({canvas:obj.canvas,dataURL:initialDataURL||obj.canvas.toDataURL(),code:generateSymbolCode(idx)});
+  updateKeyMapping();
+}
+
+function updateKeyMapping(){
+  saveState(); keyMapping.innerHTML='';
+  symbols.forEach((s, idx)=>{
+    const row=document.createElement('div'); row.className='map-row';
+    const img=document.createElement('img'); img.src=s.dataURL||s.canvas.toDataURL(); img.width=40; img.height=40;
+    const label=document.createElement('span'); label.textContent=`Símbolo ${idx+1} (${s.code})`;
+    const select=document.createElement('input'); select.placeholder='tecla (ej: a, 1, Enter)'; select.value=''; select.style.width='90px';
+    const existing=Array.from(keyMap.entries()).find(([k,v])=>v===s.code); if(existing) select.value=existing[0];
+    const saveBtn=document.createElement('button'); saveBtn.className='button small'; saveBtn.textContent='Asignar'; saveBtn.addEventListener('click',()=>{const key=select.value.trim().toLowerCase(); if(!key){alert('Introduce una tecla'); return;} keyMap.forEach((val,k)=>{if(k===key) keyMap.delete(k);}); keyMap.set(key,s.code); updateKeyMapping();});
+    const removeMapping=document.createElement('button'); removeMapping.className='button small'; removeMapping.textContent='Quitar'; removeMapping.addEventListener('click',()=>{for(const [k,v] of keyMap.entries()){if(v===s.code) keyMap.delete(k);} updateKeyMapping();});
+    row.appendChild(img); row.appendChild(label); row.appendChild(select); row.appendChild(saveBtn); row.appendChild(removeMapping);
+    keyMapping.appendChild(row);
+  });
+}
+
+function onKeyDown(e){
+  if(!toggleActive.checked) return;
+  const key=e.key.toLowerCase();
+  const mapped=keyMap.get(key);
+  if(mapped){ e.preventDefault(); insertTextAtCaret(mapped); }
+}
+
+function insertTextAtCaret(text){
+  const sel=window.getSelection();
+  if(!sel || sel.rangeCount===0){ output.textContent+=text; return; }
+  const range=sel.getRangeAt(0); range.deleteContents();
+  const node=document.createTextNode(text);
+  range.insertNode(node);
+  range.setStartAfter(node); range.setEndAfter(node);
+  sel.removeAllRanges(); sel.addRange(range);
+}
+
+addSymbolBtn.addEventListener('click',()=>addSymbol());
+document.addEventListener('keydown',onKeyDown);
+copyPlain.addEventListener('click',()=>{navigator.clipboard.writeText(output.textContent); alert('Texto copiado al portapapeles');});
+addSymbol();
+</script>
+</body>
+</html>
