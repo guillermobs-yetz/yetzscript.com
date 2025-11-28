@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="robots" content="index, follow">
-  <meta name="google-site-verification" content="73509ac76f9298be">
+  <meta name="google-site-verification" content="google73509ac76f9298be.html">
   <title>YetzScript</title>
   <style>
     body{font-family:sans-serif;padding:20px;}
@@ -62,11 +62,8 @@ function refreshMapping(){
     const row=document.createElement('div');
     const label=document.createElement('span'); label.textContent='Símbolo '+(i+1)+' ';
     const inp=document.createElement('input'); inp.placeholder='tecla';
-
-    // Reemplazo del optional chaining para compatibilidad
     let found = [...keyMap.entries()].find(e=>e[1]===i);
     inp.value = found ? found[0] : '';
-
     inp.addEventListener('input',()=>{
       for(const [k,v] of keyMap.entries()) if(v===i) keyMap.delete(k);
       keyMap.set(inp.value,i);
