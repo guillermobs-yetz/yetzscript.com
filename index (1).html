@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>YetzScript</title>
+<style>
+body{font-family:sans-serif;padding:20px;}
+#symbolGrid{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px;}
+canvas.symbol{border:1px solid #888;}
+#output{border:1px solid #333;min-height:150px;padding:10px;}
+</style>
+</head>
+<body>
+<h1>YetzScript</h1>
+
+<h2>1. Dibujar símbolos</h2>
+<div id="symbolGrid"></div>
+<button id="addSymbol">Añadir símbolo</button>
+
+<h2>2. Asignar teclas</h2>
+<div id="mapping"></div>
+
+<label><input type="checkbox" id="activate"> Activar alfabeto</label>
+
+<h2>3. Escribir</h2>
+<div id="output" contenteditable="true"></div>
+<button id="copy">Copiar</button>
+
+<script>
+const symbols = [];
+const keyMap = new Map();
+
+function createCanvas(dataURL){
+  const c=document.createElement('canvas');
+  c.width=80;c.height=80;c.className='symbol';
+  const ctx=c.getContext('2d');
+  let drawing=false;
+  if(dataURL){
+    const img=new Image(); img.onload=()=>ctx.drawImage(img,0,0); img.src=dataURL;
+  }
+  c.addEventListener('mousedown',()=>drawing=true);
+  c.addEventListener('mouseup',()=>drawing=false);
+  c.addEventListener('mouseleave',()=>drawing=false);
+  c.addEventListener('mousemove',e=>{
+    if(!drawing)return;
+    const r=c.getBoundingClientRect();
+    ctx.fillRect(e.clientX-r.left,e.clientY-r.top,2,2);
+  });
+  return c;
+}
+
+function refreshMapping(){
+  const m=document.getElementById('mapping');
+  m.innerHTML='';
+  symbols.forEach((s,i)=>{
+    const row=document.createElement('div');
+    const label=document.createElement('span'); label.textContent='Símbolo '+(i+1)+' ';
+    const inp=document.createElement('input'); inp.placeholder='tecla';
+    inp.value=[...keyMap.entries()].find(e=>e[1]===i)?.[0]||'';
+    inp.addEventListener('input',()=>{
+      for(const [k,v] of keyMap.entries()) if(v===i) keyMap.delete(k);
+      keyMap.set(inp.value,i);
+    });
+    row.appendChild(s.cloneNode(true));
+    row.appendChild(label);
+    row.appendChild(inp);
+    m.appendChild(row);
+  });
+}
+
+document.getElementById('addSymbol').onclick=()=>{
+  const grid=document.getElementById('symbolGrid');
+  const c=createCanvas();
+  symbols.push(c);
+  grid.appendChild(c);
+  refreshMapping();
+};
+
+document.addEventListener('keydown',e=>{
+  if(!document.getElementById('activate').checked) return;
+  const idx=keyMap.get(e.key);
+  if(idx==null) return;
+  e.preventDefault();
+  const img=document.createElement('img');
+  img.src=symbols[idx].toDataURL();
+  img.style.width='40px';
+  img.style.height='40px';
+  const out=document.getElementById('output');
+  const sel=window.getSelection();
+  if(sel.rangeCount){
+    const r=sel.getRangeAt(0);
+    r.insertNode(img);
+    r.collapse(false);
+  } else {
+    out.appendChild(img);
+  }
+});
+
+document.getElementById('copy').onclick=async()=>{
+  const out=document.getElementById('output');
+  const html=out.innerHTML;
+  try{
+    await navigator.clipboard.write([
+      new ClipboardItem({'text/html': new Blob([html],{type:'text/html'})})
+    ]);
+    alert('Copiado como HTML con imágenes');
+  }catch(err){
+    const range=document.createRange(); range.selectNodeContents(out);
+    const sel=window.getSelection(); sel.removeAllRanges(); sel.addRange(range);
+    document.execCommand('copy'); sel.removeAllRanges();
+    alert('Copiado (modo compatibilidad)');
+  }
+};
+</script>
+</body>
+</html>
