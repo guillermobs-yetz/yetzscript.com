@@ -1,16 +1,18 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
+  <meta charset="UTF-8">
   <meta name="robots" content="index, follow">
   <meta name="google-site-verification" content="73509ac76f9298be">
-<meta charset="UTF-8">
-<title>YetzScript</title>
-<style>
-body{font-family:sans-serif;padding:20px;}
-#symbolGrid{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px;}
-canvas.symbol{border:1px solid #888;}
-#output{border:1px solid #333;min-height:150px;padding:10px;}
-</style>
+  <title>YetzScript</title>
+  <style>
+    body{font-family:sans-serif;padding:20px;}
+    #symbolGrid{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px;}
+    canvas.symbol{border:1px solid #888;}
+    #output{border:1px solid #333;min-height:150px;padding:10px;}
+    #mapping div{margin-bottom:5px;}
+    #mapping input{width:50px;margin-left:5px;}
+  </style>
 </head>
 <body>
 <h1>YetzScript</h1>
@@ -38,7 +40,9 @@ function createCanvas(dataURL){
   const ctx=c.getContext('2d');
   let drawing=false;
   if(dataURL){
-    const img=new Image(); img.onload=()=>ctx.drawImage(img,0,0); img.src=dataURL;
+    const img=new Image(); 
+    img.onload=()=>ctx.drawImage(img,0,0); 
+    img.src=dataURL;
   }
   c.addEventListener('mousedown',()=>drawing=true);
   c.addEventListener('mouseup',()=>drawing=false);
@@ -58,7 +62,11 @@ function refreshMapping(){
     const row=document.createElement('div');
     const label=document.createElement('span'); label.textContent='Símbolo '+(i+1)+' ';
     const inp=document.createElement('input'); inp.placeholder='tecla';
-    inp.value=[...keyMap.entries()].find(e=>e[1]===i)?.[0]||'';
+
+    // Reemplazo del optional chaining para compatibilidad
+    let found = [...keyMap.entries()].find(e=>e[1]===i);
+    inp.value = found ? found[0] : '';
+
     inp.addEventListener('input',()=>{
       for(const [k,v] of keyMap.entries()) if(v===i) keyMap.delete(k);
       keyMap.set(inp.value,i);
@@ -113,6 +121,9 @@ document.getElementById('copy').onclick=async()=>{
     alert('Copiado (modo compatibilidad)');
   }
 };
+
+// Añadir un símbolo inicial para empezar
+document.getElementById('addSymbol').click();
 </script>
 </body>
 </html>
